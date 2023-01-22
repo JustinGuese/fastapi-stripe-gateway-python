@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: paymentgateway-app
+  name: paymentgateway-app
+  namespace: paymentgateway-staging
+  annotations:
+    backup.velero.io/backup-volumes: paymentgateway-pv,paymentgateway-pvc
+spec:
+  strategy:
+    type: RollingUpdate
+  replicas: 1
+  selector:
+    matchLabels:
+      app: paymentgateway-app
+  template:
+    metadata:
+      labels:
+        app: paymentgateway-app
+      annotations:
+        backup.velero.io/backup-volumes: paymentgateway-pv,paymentgateway-pvc
+    spec:
+      containers:
+        - image: guestros/stripe-payment-backend:latest
+          imagePullPolicy: Always
+          name: paymentgateway-app
+          ports:
+            - containerPort: 8000
+          env:
+            - name: STRIPE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: stripeapi
+                  key: STRIPE_API_KEY
+          # volumeMounts:
+          #   - mountPath: /data/db/
+          #     name: paymentgateway-pv
+      restartPolicy: Always
+      # volumes:
+      #   - name: paymentgateway-pv
+      #     persistentVolumeClaim:
+      #       claimName: paymentgateway-pvc
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: paymentgateway
+  name: paymentgateway-service
+  namespace: paymentgateway-staging
+spec:
+  ports:
+    - name: "paymentgateway-service"
+      port: 8000
+      targetPort: 8000
+  selector:
+    app: paymentgateway-app
