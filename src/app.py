@@ -15,7 +15,7 @@ stripe.api_key = environ["STRIPE_API_KEY"]
 
 stripe.billing_portal.Configuration.create(
   business_profile={
-    "headline": "EasyCloudHost.de - Payment Gateway",
+    "headline": "Pseudonymisieren.de Payment Gateway",
   },
   features={"invoice_history": {"enabled": True}},
 )
@@ -63,4 +63,29 @@ def customer_portal( _oauth2_proxy: str = Cookie(default="")):
         customer=customer["id"],
         return_url=BASE_URL + '/account',
     )
+    return RedirectResponse(session.url)
+
+@app.get("/pseudode/subscription/{stripeproductid}", tags=["Payment Gateway"])
+def getSubscription(stripeproductid: str, _oauth2_proxy: str = Cookie(default="")):
+    userinfo = getUserInfo(_oauth2_proxy)
+    customer = checkIfCustomerExists(userinfo["email"])
+    if customer is None:
+        print("customer does not exist, create: ", userinfo["email"])
+        customer = stripe.Customer.create(
+            email=userinfo["email"],
+            description="Customer for " + userinfo["email"],
+            metadata={"id": userinfo["user"]},
+        )
+    returnurl = "https://pseudonymisieren.de"
+    session = stripe.checkout.Session.create(
+        success_url=returnurl + '/success?session_id={CHECKOUT_SESSION_ID}',
+        cancel_url=returnurl + '/canceled',
+        mode='subscription',
+        customer = customer["id"],
+        line_items=[{
+            'price': stripeproductid,
+            # For metered billing, do not pass quantity
+            'quantity': 1
+        }],
+        )
     return RedirectResponse(session.url)
